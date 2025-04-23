@@ -1,6 +1,6 @@
 /**
- * Main Application Logic - Simplified Version
- * This file contains the main functionality for the Pokemon Card Flip App
+ * Main Application Logic - Memory Game Version
+ * This file contains the main functionality for the Pokemon Memory Game
  */
 import { PokemonService } from './pokemon.js';
 
@@ -10,20 +10,21 @@ const loadingSpinner = document.getElementById('loading-spinner');
 
 // Constants
 const CARD_COUNT = 12;
+const TOTAL_PAIRS = 6;
 
 // Application State
 let cards = [];
+let firstSelectedCard = null;
+let secondSelectedCard = null;
+let isProcessingPair = false;
+let matchedPairs = 0;
 
 // Debug flag - set to true to simulate slower loading
-const DEBUG_SHOW_SPINNER = false;
-const LOADING_DELAY = 4000; // 2 seconds delay
+const DEBUG_SHOW_SPINNER = true;
+const LOADING_DELAY = 1000; // 1 second delay
 
 /**
  * Initialize the application
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function | MDN: async function}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event | MDN: DOMContentLoaded}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/classList | MDN: classList}
  */
 async function initApp() {
   // Show loading spinner
@@ -48,9 +49,6 @@ async function initApp() {
 
 /**
  * Create card elements in the grid
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement | MDN: createElement}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML | MDN: innerHTML}
  */
 function createCardElements() {
   // Clear existing cards
@@ -69,9 +67,6 @@ function createCardElements() {
  * Create a single card element
  * @param {number} index - Card index
  * @returns {HTMLElement} Card element
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset | MDN: dataset}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Node/appendChild | MDN: appendChild}
  */
 function createCardElement(index) {
   // Create card elements
@@ -105,36 +100,64 @@ function createCardElement(index) {
 
 /**
  * Fetch and assign Pokemon to cards
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/try...catch | MDN: try...catch}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise | MDN: Promise}
  */
 async function fetchAndAssignPokemon() {
   try {
-    // Fetch multiple random Pokemon
-    const pokemonList = await PokemonService.fetchMultipleRandomPokemon(CARD_COUNT);
+    // Fetch 6 unique Pokémon instead of 12
+    const pokemonList = await PokemonService.fetchMultipleRandomPokemon(6);
+
+    // Create pairs by duplicating each Pokémon
+    const pokemonPairs = [];
+    pokemonList.forEach(pokemon => {
+      // Add two copies of each Pokémon for matching pairs
+      // Using spread operator to create a shallow copy
+      pokemonPairs.push({ ...pokemon });
+      pokemonPairs.push({ ...pokemon });
+    });
+
+    // Shuffle the pairs using Fisher-Yates algorithm
+    const shuffledPairs = shuffleArray(pokemonPairs);
 
     // If debug flag is on, add artificial delay to show the spinner
     if (DEBUG_SHOW_SPINNER) {
       await new Promise(resolve => setTimeout(resolve, LOADING_DELAY));
     }
 
-    // Assign Pokemon to cards
-    for (let i = 0; i < CARD_COUNT; i++) {
-      assignPokemonToCard(cards[i], pokemonList[i]);
+    // Assign Pokémon to cards with error checking
+    for (let i = 0; i < Math.min(CARD_COUNT, shuffledPairs.length); i++) {
+      if (cards[i] && shuffledPairs[i]) {
+        assignPokemonToCard(cards[i], shuffledPairs[i]);
+      }
     }
   } catch (error) {
     console.error('Error fetching and assigning Pokemon:', error);
+    // User-friendly error handling
+    showErrorMessage('Failed to load Pokémon. Please try refreshing the page.');
   }
+}
+
+/**
+ * Fisher-Yates shuffle algorithm
+ * @param {Array} array - Array to shuffle
+ * @returns {Array} Shuffled array copy
+ */
+function shuffleArray(array) {
+  // Create a deep copy of the array to avoid modifying the original
+  const arrayCopy = structuredClone(array);
+
+  // Fisher-Yates algorithm
+  for (let i = arrayCopy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arrayCopy[i], arrayCopy[j]] = [arrayCopy[j], arrayCopy[i]];
+  }
+
+  return arrayCopy;
 }
 
 /**
  * Assign a Pokemon to a card
  * @param {HTMLElement} card - Card element
  * @param {Object} pokemon - Pokemon data
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify | MDN: JSON.stringify}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelector | MDN: querySelector}
  */
 function assignPokemonToCard(card, pokemon) {
   if (!card || !pokemon) {
@@ -206,39 +229,198 @@ function assignPokemonToCard(card, pokemon) {
 /**
  * Handle card click
  * @param {Event} event - Click event
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Event | MDN: Event}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/classList | MDN: classList}
  */
 function handleCardClick(event) {
-  // Find the clicked card
-  let card = event.target;
-  while (card && !card.classList.contains('card')) {
-    card = card.parentElement;
+  // Find the clicked card using closest for better performance
+  const card = event.target.closest('.card');
+
+  // Early return for invalid clicks
+  if (!card) {
+    return; // Not a card or child of card
   }
 
-  if (!card) {
+  // Guard clauses for better readability
+  if (card.classList.contains('flipped') || card.classList.contains('matched')) {
+    return; // Already flipped or matched
+  }
+
+  // Prevent clicking during timeout/animation
+  if (isProcessingPair) {
     return;
   }
 
-  // Toggle card flip
-  card.classList.toggle('flipped');
+  // Flip the card
+  card.classList.add('flipped');
+
+  // Track selections
+  if (!firstSelectedCard) {
+    // First card selection
+    firstSelectedCard = card;
+  } else if (firstSelectedCard !== card) {
+    // Second card selection
+    secondSelectedCard = card;
+
+    // Check for a match
+    checkForMatch();
+  }
+}
+
+/**
+ * Check if selected cards match
+ */
+function checkForMatch() {
+  // Get Pokémon data from both cards with error handling
+  let firstPokemonData, secondPokemonData;
+
+  try {
+    firstPokemonData = JSON.parse(firstSelectedCard.dataset.pokemon);
+    secondPokemonData = JSON.parse(secondSelectedCard.dataset.pokemon);
+  } catch (error) {
+    console.error('Error parsing Pokémon data:', error);
+    resetSelection();
+    return;
+  }
+
+  // Guard clause if either data is missing
+  if (!firstPokemonData || !secondPokemonData) {
+    console.error('Missing Pokémon data');
+    resetSelection();
+    return;
+  }
+
+  // Compare Pokémon IDs to check for a match
+  if (firstPokemonData.id === secondPokemonData.id) {
+    handleMatch();
+  } else {
+    handleNonMatch();
+  }
+}
+
+/**
+ * Handle matching cards
+ */
+function handleMatch() {
+  // Mark cards as matched
+  firstSelectedCard.classList.add('matched');
+  secondSelectedCard.classList.add('matched');
+
+  // Increment match counter
+  matchedPairs++;
+
+  // Check if game is complete
+  if (matchedPairs === TOTAL_PAIRS) {
+    setTimeout(showGameComplete, 500);
+  }
+
+  // Reset selection for next turn
+  resetSelection();
+}
+
+/**
+ * Handle non-matching cards
+ */
+function handleNonMatch() {
+  // Set processing flag to prevent further interaction during timeout
+  isProcessingPair = true;
+
+  // Flip cards back after a delay
+  setTimeout(() => {
+    firstSelectedCard.classList.remove('flipped');
+    secondSelectedCard.classList.remove('flipped');
+
+    // Reset selection after animation completes
+    resetSelection();
+
+    // Release the processing lock
+    isProcessingPair = false;
+  }, 1000); // 1 second delay
+}
+
+/**
+ * Reset card selection state
+ */
+function resetSelection() {
+  firstSelectedCard = null;
+  secondSelectedCard = null;
+}
+
+/**
+ * Show game completion message
+ */
+function showGameComplete() {
+  // Create a container for the message
+  const messageContainer = document.createElement('div');
+  messageContainer.classList.add('completion-message');
+
+  // Add the message content
+  messageContainer.innerHTML = `
+    <h2>Congratulations!</h2>
+    <p>You found all the Pokémon pairs!</p>
+    <button id="play-again">Play Again</button>
+  `;
+
+  // Add to the page
+  document.querySelector('.container').appendChild(messageContainer);
+
+  // Set up the play again button
+  document.getElementById('play-again').addEventListener('click', () => {
+    messageContainer.remove();
+    resetGame();
+  });
+}
+
+/**
+ * Reset the game
+ */
+function resetGame() {
+  // Reset game state
+  firstSelectedCard = null;
+  secondSelectedCard = null;
+  isProcessingPair = false;
+  matchedPairs = 0;
+
+  // Reset the UI
+  const matchedCards = document.querySelectorAll('.card.matched');
+  matchedCards.forEach(card => card.classList.remove('matched'));
+
+  const flippedCards = document.querySelectorAll('.card.flipped');
+  flippedCards.forEach(card => card.classList.remove('flipped'));
+
+  // Get new Pokémon and shuffle
+  fetchAndAssignPokemon();
+}
+
+/**
+ * Show error message
+ * @param {string} message - Error message
+ */
+function showErrorMessage(message) {
+  const errorContainer = document.createElement('div');
+  errorContainer.className = 'error-message';
+  errorContainer.textContent = message;
+
+  // Add retry button
+  const retryButton = document.createElement('button');
+  retryButton.textContent = 'Try Again';
+  retryButton.addEventListener('click', () => {
+    errorContainer.remove();
+    initApp();
+  });
+
+  errorContainer.appendChild(retryButton);
+  document.querySelector('.container').appendChild(errorContainer);
 }
 
 /**
  * Set up event listeners
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener | MDN: addEventListener}
  */
 function setupEventListeners() {
-  // Card click event
+  // Card click event - using event delegation for all cards
   cardGrid.addEventListener('click', handleCardClick);
 }
 
 /**
  * Show loading spinner
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/classList | MDN: classList}
  */
 function showLoading() {
   loadingSpinner.classList.remove('hidden');
@@ -246,8 +428,6 @@ function showLoading() {
 
 /**
  * Hide loading spinner
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/classList | MDN: classList}
  */
 function hideLoading() {
   loadingSpinner.classList.add('hidden');

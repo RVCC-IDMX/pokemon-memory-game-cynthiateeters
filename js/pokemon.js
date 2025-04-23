@@ -9,18 +9,9 @@ const API_BASE_URL = 'https://pokeapi.co/api/v2';
 // Total number of Pokemon in the API (as of Gen 9)
 const TOTAL_POKEMON = 1008;
 
-// Simplified version - removed unnecessary variables
-// let allPokemonTypes = [];
-// let caughtPokemon = {};
-// let allFetchedPokemon = [];
-
 /**
  * Fetch a random Pokemon from the PokeAPI
  * @returns {Promise<Object>} Pokemon data
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/fetch | MDN: fetch API}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random | MDN: Math.random}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/floor | MDN: Math.floor}
  */
 async function fetchRandomPokemon() {
   try {
@@ -48,10 +39,6 @@ async function fetchRandomPokemon() {
  * Fetch multiple random Pokemon at once
  * @param {number} count - Number of Pokemon to fetch
  * @returns {Promise<Array<Object>>} Array of Pokemon data
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/fill | MDN: Array.fill}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map | MDN: Array.map}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all | MDN: Promise.all}
  */
 async function fetchMultipleRandomPokemon(count) {
   try {
@@ -63,11 +50,8 @@ async function fetchMultipleRandomPokemon(count) {
     // Wait for all promises to resolve
     const pokemonList = await Promise.all(promises);
 
-    // Simplified - removed filtering and type extraction
-    // allFetchedPokemon = [...pokemonList];
-    // updatePokemonTypes(pokemonList);
-
-    return pokemonList;
+    // Filter out any null responses
+    return pokemonList.filter(pokemon => pokemon !== null);
   } catch (error) {
     console.error('Error fetching multiple Pokemon:', error);
     return [];
@@ -78,9 +62,6 @@ async function fetchMultipleRandomPokemon(count) {
  * Process the raw Pokemon data into a more usable format
  * @param {Object} data - Raw Pokemon data from the API
  * @returns {Object} Processed Pokemon data
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map | MDN: Array.map}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find | MDN: Array.find}
  */
 function processPokemonData(data) {
   return {
@@ -106,9 +87,6 @@ function processPokemonData(data) {
  * @param {Array<Object>} stats - Stats array from the API
  * @param {string} statName - Name of the stat to find
  * @returns {number} Stat value
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find | MDN: Array.find}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Optional_chaining | MDN: Optional chaining}
  */
 function findStat(stats, statName) {
   const stat = stats.find(s => s.stat.name === statName);
@@ -119,24 +97,12 @@ function findStat(stats, statName) {
  * Capitalize the first letter of a string
  * @param {string} string - String to capitalize
  * @returns {string} Capitalized string
- *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/charAt | MDN: String.charAt}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/slice | MDN: String.slice}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace | MDN: String.replace}
  */
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.replace('-', ' ').slice(1);
 }
 
-// Removed unnecessary functions:
-// - updatePokemonTypes
-// - populateTypeFilter
-// - filterPokemonByType
-// - catchPokemon
-// - updateCaughtCounter
-// - getPokemonCry
-
-// Export simplified functions for use in app.js
+// Export the functions for use in app.js
 export const PokemonService = {
   fetchRandomPokemon,
   fetchMultipleRandomPokemon
